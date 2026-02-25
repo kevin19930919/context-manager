@@ -69,3 +69,48 @@ All data is stored locally in the `data/` directory:
 - Electron
 - Node.js
 - Vanilla JavaScript (no framework needed for MVP)
+
+## MCP Server Integration
+
+Context Manager includes an **MCP (Model Context Protocol) Server** that exposes your contexts to Claude Code, allowing you to search and manage your screenshots and notes directly from your IDE!
+
+### Features
+
+- 🔍 **Search Contexts** - Filter by keywords, tags, type, project, and date
+- 📸 **View Screenshots** - AI can "see" your screenshots (encoded as base64)
+- 💾 **Create Contexts** - Save notes from Claude Code to Context Manager
+- 📋 **List Projects** - View all project names
+- ⏰ **Recent Contexts** - Quickly access latest contexts
+
+### Quick Setup
+
+1. **Install Python dependencies:**
+   ```bash
+   cd mcp-server
+   pip install mcp
+   ```
+
+2. **Configure Claude Code** by editing `~/.claude/mcp_settings.json`:
+   ```json
+   {
+     "mcpServers": {
+       "context-manager": {
+         "command": "python3",
+         "args": ["/absolute/path/to/context-manager/mcp-server/server.py"],
+         "env": {}
+       }
+     }
+   }
+   ```
+
+3. **Restart Claude Code** and verify the connection in settings.
+
+### Usage Examples
+
+Once connected, you can ask Claude Code:
+- "Find my recent bug screenshots"
+- "Search for 'API' related notes"
+- "Show contexts from project 'MyProject'"
+- "What's in screenshot ID 1234567890?"
+
+For detailed setup and troubleshooting, see [`mcp-server/README.md`](mcp-server/README.md).
