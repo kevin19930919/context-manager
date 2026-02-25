@@ -1,0 +1,32 @@
+{
+  "name": "context-manager",
+  "version": "0.1.0",
+  "description": "A simple context manager for capturing information across different tools",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "keywords": [
+    "electron",
+    "context",
+    "manager"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "electron": "^27.3.11",
+    "jest": "^30.2.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.73.0",
+    "markdown-it": "^14.1.1",
+    "openai": "^6.18.0",
+    "screenshot-desktop": "^1.15.0",
+    "sharp": "^0.33.0"
+  }
+}

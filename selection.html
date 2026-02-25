@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Select Area</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      cursor: crosshair;
+    }
+
+    body {
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.3);
+      position: relative;
+    }
+
+    #screenshot {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      max-width: 100vw;
+      max-height: 100vh;
+      object-fit: contain;
+      opacity: 1.0;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    #selection-box {
+      position: absolute;
+      border: 2px solid #3b82f6;
+      background: rgba(59, 130, 246, 0.1);
+      display: none;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    #hint {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      z-index: 1000;
+      backdrop-filter: blur(10px);
+      pointer-events: none;
+    }
+
+    #dimensions {
+      position: absolute;
+      background: rgba(59, 130, 246, 0.95);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      display: none;
+      pointer-events: none;
+      z-index: 1001;
+    }
+  </style>
+</head>
+<body>
+  <div id="hint">按住鼠標拖動選擇區域 | ESC 取消</div>
+  <img id="screenshot" src="" alt="Screenshot">
+  <div id="selection-box"></div>
+  <div id="dimensions"></div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+    const screenshot = document.getElementById('screenshot');
+    const selectionBox = document.getElementById('selection-box');
+    const dimensions = document.getElementById('dimensions');
+    const hint = document.getElementById('hint');
+
+    console.log('Selection.html loaded');
+
+    let startX = 0;
+    let startY = 0;
+    let isSelecting = false;
+    let screenshotPath = '';
+    let displayWidth = 0;
+    let displayHeight = 0;
+    let actualWidth = 0;
+    let actualHeight = 0;
+
+    // 接收截圖路徑
+    ipcRenderer.on('show-screenshot', (event, data) => {
+      console.log('Received screenshot data:', data);
+      screenshotPath = data.path;
+      actualWidth = data.width;
+      actualHeight = data.height;
+
+      // Convert to file:// URL for proper loading in Electron
+      const fileUrl = 'file://' + screenshotPath;
+      screenshot.src = fileUrl;
+      console.log('Screenshot src set to:', fileUrl);
+
+      // 隱藏提示
+      setTimeout(() => {
+        hint.style.opacity = '0';
+        hint.style.transition = 'opacity 0.3s';
+      }, 2000);
+    });
+
+    // 獲取實際顯示尺寸
+    screenshot.onload = () => {
+      // Calculate actual display size considering object-fit: contain
+      const imgRatio = actualWidth / actualHeight;
+      const windowRatio = window.innerWidth / window.innerHeight;
+
+      if (imgRatio > windowRatio) {
+        // Image is wider - width fills window
+        displayWidth = window.innerWidth;
+        displayHeight = displayWidth / imgRatio;
+      } else {
+        // Image is taller - height fills window
+        displayHeight = window.innerHeight;
+        displayWidth = displayHeight * imgRatio;
+      }
+
+      console.log('Screenshot loaded');
+      console.log('Natural size (original image):', screenshot.naturalWidth, 'x', screenshot.naturalHeight);
+      console.log('Window size:', window.innerWidth, 'x', window.innerHeight);
+      console.log('Calculated display size:', Math.round(displayWidth), 'x', Math.round(displayHeight));
+      console.log('Scale ratio:', (actualWidth / displayWidth).toFixed(2), 'x', (actualHeight / displayHeight).toFixed(2));
+      console.log('Image offset on screen:',
+        'left:', Math.round((window.innerWidth - displayWidth) / 2),
+        'top:', Math.round((window.innerHeight - displayHeight) / 2));
+    };
+
+    screenshot.onerror = (error) => {
+      console.error('Screenshot failed to load:', error);
+    };
+
+    // Calculate image offset (for centered image with object-fit: contain)
+    function getImageOffset() {
+      return {
+        left: Math.round((window.innerWidth - displayWidth) / 2),
+        top: Math.round((window.innerHeight - displayHeight) / 2)
+      };
+    }
+
+    // 鼠標按下
+    document.addEventListener('mousedown', (e) => {
+      console.log('Mouse down at:', e.clientX, e.clientY);
+      isSelecting = true;
+      startX = e.clientX;
+      startY = e.clientY;
+
+      selectionBox.style.left = startX + 'px';
+      selectionBox.style.top = startY + 'px';
+      selectionBox.style.width = '0px';
+      selectionBox.style.height = '0px';
+      selectionBox.style.display = 'block';
+      dimensions.style.display = 'block';
+      console.log('Selection started');
+    });
+
+    // 鼠標移動
+    document.addEventListener('mousemove', (e) => {
+      if (!isSelecting) return;
+
+      const currentX = e.clientX;
+      const currentY = e.clientY;
+
+      const width = Math.abs(currentX - startX);
+      const height = Math.abs(currentY - startY);
+      const left = Math.min(currentX, startX);
+      const top = Math.min(currentY, startY);
+
+      selectionBox.style.left = left + 'px';
+      selectionBox.style.top = top + 'px';
+      selectionBox.style.width = width + 'px';
+      selectionBox.style.height = height + 'px';
+
+      // 計算實際像素尺寸
+      const scaleX = actualWidth / displayWidth;
+      const scaleY = actualHeight / displayHeight;
+      const actualW = Math.round(width * scaleX);
+      const actualH = Math.round(height * scaleY);
+
+      // 顯示尺寸
+      dimensions.textContent = `${actualW} × ${actualH}`;
+      dimensions.style.left = (left + width + 10) + 'px';
+      dimensions.style.top = top + 'px';
+    });
+
+    // 鼠標釋放
+    document.addEventListener('mouseup', (e) => {
+      console.log('Mouse up, isSelecting:', isSelecting);
+      if (!isSelecting) return;
+      isSelecting = false;
+
+      const rect = {
+        x: parseInt(selectionBox.style.left),
+        y: parseInt(selectionBox.style.top),
+        width: parseInt(selectionBox.style.width),
+        height: parseInt(selectionBox.style.height)
+      };
+
+      console.log('Selection rect (screen coords):', rect);
+
+      // 檢查選擇區域是否有效
+      if (rect.width < 10 || rect.height < 10) {
+        console.log('Selection too small, ignoring');
+        selectionBox.style.display = 'none';
+        dimensions.style.display = 'none';
+        return;
+      }
+
+      // 計算圖片偏移（居中顯示的情況）
+      const offset = getImageOffset();
+      console.log('Image offset:', offset);
+
+      // 轉換為圖片坐標（減去偏移）
+      const imgX = rect.x - offset.left;
+      const imgY = rect.y - offset.top;
+
+      console.log('Selection rect (image coords):', { x: imgX, y: imgY, width: rect.width, height: rect.height });
+
+      // 計算實際裁剪坐標（考慮縮放比例）
+      const scaleX = actualWidth / displayWidth;
+      const scaleY = actualHeight / displayHeight;
+
+      const cropRect = {
+        x: Math.max(0, Math.round(imgX * scaleX)),
+        y: Math.max(0, Math.round(imgY * scaleY)),
+        width: Math.round(rect.width * scaleX),
+        height: Math.round(rect.height * scaleY)
+      };
+
+      console.log('Crop rect (original image coords):', cropRect);
+      console.log('Sending area-selected event');
+
+      // 發送選擇結果
+      ipcRenderer.send('area-selected', {
+        sourcePath: screenshotPath,
+        crop: cropRect
+      });
+      console.log('area-selected event sent');
+    });
+
+    // ESC 取消
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        ipcRenderer.send('cancel-selection');
+      }
+    });
+  </script>
+</body>
+</html>

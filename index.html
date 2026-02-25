@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Context Manager</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+      background: #f8f9fa;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      color: #1a1a1a;
+    }
+
+    kbd {
+      display: inline-block;
+      padding: 2px 6px;
+      font-size: 11px;
+      font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+      line-height: 1.4;
+      color: #1f2937;
+      background-color: #f3f4f6;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      white-space: nowrap;
+    }
+
+    .header {
+      background: white;
+      padding: 24px 32px;
+      border-bottom: 1px solid #e5e7eb;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+
+    .header h1 {
+      font-size: 26px;
+      color: #1a1a1a;
+      margin-bottom: 4px;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+    }
+
+    .header .subtitle {
+      color: #6b7280;
+      font-size: 14px;
+      font-weight: 400;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .current-project-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      background: #3b82f6;
+      color: white;
+      border-radius: 6px;
+      font-weight: 500;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .current-project-badge:hover {
+      background: #2563eb;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-manage-projects {
+      padding: 4px 12px;
+      background: #f3f4f6;
+      color: #374151;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-manage-projects:hover {
+      background: #e5e7eb;
+      border-color: #d1d5db;
+    }
+
+    .header .controls {
+      margin-top: 20px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .header .search-box {
+      flex: 1;
+      min-width: 320px;
+      position: relative;
+    }
+
+    .header .search-box input {
+      width: 100%;
+      padding: 10px 12px 10px 38px;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fafbfc;
+      transition: all 0.15s ease;
+    }
+
+    .header .search-box input:focus {
+      outline: none;
+      border-color: #3b82f6;
+      background: white;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08);
+    }
+
+    .header .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9ca3af;
+      pointer-events: none;
+      font-size: 16px;
+    }
+
+    .header .project-filter {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .header .project-filter label {
+      font-size: 13px;
+      color: #4b5563;
+      font-weight: 600;
+    }
+
+    .header .project-filter select {
+      padding: 10px 14px;
+      border: 2px solid #3b82f6;
+      border-radius: 8px;
+      font-size: 14px;
+      background: white;
+      min-width: 220px;
+      font-weight: 500;
+      color: #1a1a1a;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .header .project-filter select:hover {
+      border-color: #2563eb;
+    }
+
+    .header .project-filter select:focus {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+    }
+
+    .header .filter-group {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .header .filter-group label {
+      font-size: 13px;
+      color: #4b5563;
+      font-weight: 600;
+    }
+
+    .header .filter-group select,
+    .header .filter-group input[type="date"] {
+      padding: 10px 12px;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fafbfc;
+      color: #1a1a1a;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .header .filter-group select:hover,
+    .header .filter-group input[type="date"]:hover {
+      border-color: #d1d5db;
+      background: white;
+    }
+
+    .header .filter-group select:focus,
+    .header .filter-group input[type="date"]:focus {
+      outline: none;
+      border-color: #3b82f6;
+      background: white;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08);
+    }
+
+    .btn-chat {
+      padding: 10px 18px;
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+    }
+
+    .btn-chat:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    }
+
+    .btn-chat:active {
+      transform: translateY(0);
+    }
+
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 32px;
+    }
+
+    .project-group {
+      background: white;
+      border-radius: 12px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      border: 1px solid #f3f4f6;
+      overflow: hidden;
+    }
+
+    .project-header {
+      background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+      padding: 14px 24px;
+      border-bottom: 1px solid #e5e7eb;
+      font-weight: 600;
+      color: #1a1a1a;
+      font-size: 15px;
+      letter-spacing: -0.2px;
+    }
+
+    .context-item {
+      padding: 18px 24px;
+      border-bottom: 1px solid #f3f4f6;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .context-item:last-child {
+      border-bottom: none;
+    }
+
+    .context-item:hover {
+      background: #fafbfc;
+    }
+
+    .context-main {
+      flex: 1;
+    }
+
+    .context-time {
+      font-size: 13px;
+      color: #6b7280;
+      font-weight: 500;
+      margin-bottom: 8px;
+      letter-spacing: 0.2px;
+    }
+
+    .context-note {
+      color: #374151;
+      margin-bottom: 10px;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .context-tags {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+
+    .tag {
+      background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+      color: #1e40af;
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid #bfdbfe;
+      letter-spacing: 0.2px;
+    }
+
+    .context-actions {
+      display: flex;
+      gap: 6px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      flex-wrap: wrap;
+      margin-left: 16px;
+    }
+
+    .context-item:hover .context-actions {
+      opacity: 1;
+    }
+
+    .btn-action {
+      padding: 6px 12px;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      color: #4b5563;
+    }
+
+    .btn-action:hover {
+      background: #e5e7eb;
+      border-color: #d1d5db;
+      transform: translateY(-1px);
+    }
+
+    .btn-delete {
+      color: #dc2626;
+      border-color: #fecaca;
+      background: #fef2f2;
+    }
+
+    .btn-delete:hover {
+      background: #fee2e2;
+      border-color: #fca5a5;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 80px 20px;
+      color: #6b7280;
+    }
+
+    .empty-state-icon {
+      font-size: 56px;
+      margin-bottom: 20px;
+      opacity: 0.7;
+    }
+
+    .empty-state-text {
+      font-size: 18px;
+      margin-bottom: 10px;
+      color: #374151;
+      font-weight: 500;
+    }
+
+    .empty-state-hint {
+      font-size: 14px;
+      color: #9ca3af;
+      line-height: 1.8;
+      text-align: center;
+    }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(4px);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 16px;
+      max-width: 90%;
+      max-height: 90%;
+      overflow: auto;
+      padding: 28px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      from {
+        transform: translateY(20px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .modal-image {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+    }
+
+    .modal-close {
+      position: sticky;
+      top: 0;
+      right: 0;
+      float: right;
+      background: #1a1a1a;
+      color: white;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 16px;
+      transition: all 0.2s ease;
+    }
+
+    .modal-close:hover {
+      background: #374151;
+      transform: translateY(-1px);
+    }
+
+    .drop-zone {
+      border: 2px dashed #d1d5db;
+      border-radius: 12px;
+      padding: 48px;
+      text-align: center;
+      color: #6b7280;
+      background: white;
+      margin-bottom: 24px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .drop-zone:hover {
+      border-color: #3b82f6;
+      background: #fafbfc;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+    }
+
+    .drop-zone.drag-over {
+      border-color: #3b82f6;
+      background: #eff6ff;
+      color: #3b82f6;
+      transform: scale(1.02);
+    }
+
+    .drop-zone input[type="file"] {
+      display: none;
+    }
+
+    .link-input-zone {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .link-input-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-weight: 500;
+      color: #374151;
+    }
+
+    .link-input-form {
+      display: flex;
+      gap: 12px;
+    }
+
+    .link-input-form input[type="url"] {
+      flex: 1;
+      padding: 12px 16px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .link-input-form input[type="url"]:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .btn-save-link {
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .btn-save-link:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-save-link:active {
+      transform: translateY(0);
+    }
+
+    .drop-zone-icon {
+      font-size: 42px;
+      margin-bottom: 16px;
+      opacity: 0.8;
+    }
+
+    .drop-zone.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .project-hint {
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      border: 1.5px solid #fbbf24;
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #92400e;
+      text-align: center;
+      font-weight: 500;
+    }
+
+    /* Tags filter */
+    .tags-filter {
+      background: white;
+      border-radius: 12px;
+      padding: 18px 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      border: 1px solid #f3f4f6;
+    }
+
+    .tags-filter-header {
+      font-size: 13px;
+      color: #4b5563;
+      margin-bottom: 14px;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .tags-filter-clear {
+      font-size: 12px;
+      color: #3b82f6;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .tags-filter-clear:hover {
+      color: #2563eb;
+      text-decoration: underline;
+    }
+
+    .tags-filter-list {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .filter-tag {
+      background: #f3f4f6;
+      color: #4b5563;
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border: 1.5px solid transparent;
+    }
+
+    .filter-tag:hover {
+      background: #dbeafe;
+      color: #1e40af;
+      border-color: #93c5fd;
+      transform: translateY(-1px);
+    }
+
+    .filter-tag.active {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: white;
+      border-color: #2563eb;
+      box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+    }
+
+    .filter-tag .count {
+      opacity: 0.75;
+      margin-left: 6px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    /* Thumbnail preview */
+    .context-item {
+      display: flex;
+      gap: 18px;
+    }
+
+    .context-thumbnail {
+      width: 84px;
+      height: 84px;
+      flex-shrink: 0;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #f9fafb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1.5px solid #e5e7eb;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+
+    .context-thumbnail img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .context-thumbnail-placeholder {
+      font-size: 32px;
+      opacity: 0.3;
+    }
+
+    /* Markdown content styles */
+    .markdown-content {
+      line-height: 1.6;
+    }
+
+    .markdown-content h1,
+    .markdown-content h2,
+    .markdown-content h3,
+    .markdown-content h4,
+    .markdown-content h5,
+    .markdown-content h6 {
+      margin-top: 24px;
+      margin-bottom: 12px;
+      font-weight: 600;
+      line-height: 1.25;
+    }
+
+    .markdown-content h1 {
+      font-size: 2em;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 8px;
+    }
+
+    .markdown-content h2 {
+      font-size: 1.5em;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 6px;
+    }
+
+    .markdown-content h3 {
+      font-size: 1.25em;
+    }
+
+    .markdown-content p {
+      margin-bottom: 16px;
+    }
+
+    .markdown-content code {
+      background: #f6f8fa;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: #c7254e;
+    }
+
+    .markdown-content pre {
+      background: #f6f8fa;
+      padding: 16px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin-bottom: 16px;
+    }
+
+    .markdown-content pre code {
+      background: none;
+      padding: 0;
+      color: inherit;
+    }
+
+    .markdown-content ul,
+    .markdown-content ol {
+      margin-bottom: 16px;
+      padding-left: 2em;
+    }
+
+    .markdown-content li {
+      margin-bottom: 4px;
+    }
+
+    .markdown-content blockquote {
+      border-left: 4px solid #e5e7eb;
+      padding-left: 16px;
+      margin: 16px 0;
+      color: #6b7280;
+    }
+
+    .markdown-content a {
+      color: #2563eb;
+      text-decoration: none;
+    }
+
+    .markdown-content a:hover {
+      text-decoration: underline;
+    }
+
+    .markdown-content table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-bottom: 16px;
+    }
+
+    .markdown-content table th,
+    .markdown-content table td {
+      border: 1px solid #e5e7eb;
+      padding: 8px 12px;
+      text-align: left;
+    }
+
+    .markdown-content table th {
+      background: #f6f8fa;
+      font-weight: 600;
+    }
+
+    .markdown-content hr {
+      border: none;
+      border-top: 1px solid #e5e7eb;
+      margin: 24px 0;
+    }
+
+    .markdown-content strong {
+      font-weight: 600;
+    }
+
+    .markdown-content em {
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📦 Context Manager</h1>
+    <div class="subtitle">
+      <kbd>Cmd+Ctrl+Shift+4</kbd> → <kbd>Cmd+Shift+9</kbd> Screenshot · <kbd>Cmd+Shift+V</kbd> Text · <kbd>Cmd+Shift+L</kbd> Link
+      <span style="margin: 0 12px; color: #d1d5db;">|</span>
+      <span style="color: #6b7280;">Upload to:</span>
+      <span id="currentProjectDisplay" class="current-project-badge">📁 Loading...</span>
+      <button id="manageProjectsBtn" class="btn-manage-projects">🔧 Manage Projects</button>
+    </div>
+    <div class="controls">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="Search contexts... (note, content, tags)">
+      </div>
+      <div class="filter-group">
+        <label for="typeFilter">Type:</label>
+        <select id="typeFilter">
+          <option value="all">All Types</option>
+          <option value="screenshot">📸 Screenshot</option>
+          <option value="text">📝 Text</option>
+          <option value="discussion">💬 Discussion</option>
+          <option value="decision">🎯 Decision</option>
+          <option value="problem-solution">🐛 Problem & Solution</option>
+          <option value="api-design">🔌 API Design</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="dateFrom">From:</label>
+        <input type="date" id="dateFrom">
+        <label for="dateTo">To:</label>
+        <input type="date" id="dateTo">
+      </div>
+      <div class="project-filter">
+        <label for="projectFilter">View:</label>
+        <select id="projectFilter">
+          <option value="__all__">📋 All Projects</option>
+        </select>
+      </div>
+      <button class="btn-chat" id="chatBtn">
+        <span>🤖</span>
+        <span>AI Chat</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="project-hint" id="projectHint" style="display: none;">
+      ⚠️ Select a specific project to upload files or create contexts
+    </div>
+
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept="image/*,.pdf,.txt,.md,.doc,.docx,.json,.csv,.xml" multiple>
+      <div class="drop-zone-icon">📎</div>
+      <div>Drag & drop files here or <strong>click to upload</strong></div>
+      <div style="font-size: 12px; margin-top: 8px; color: #bbb;">Screenshots, PDFs, text files, and more</div>
+    </div>
+
+    <!-- Link input -->
+    <div class="link-input-zone" id="linkInputZone">
+      <div class="link-input-header">
+        <span>🔗 Save Link</span>
+        <span style="font-size: 11px; color: #999;">or use Cmd+Shift+L</span>
+      </div>
+      <div class="link-input-form">
+        <input type="url" id="linkInput" placeholder="Paste URL here (e.g., https://example.com)">
+        <button id="saveLinkBtn" class="btn-save-link">
+          <span>💾 Save</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Tags filter -->
+    <div class="tags-filter" id="tagsFilter" style="display: none;">
+      <div class="tags-filter-header">
+        <span>🏷️ Filter by Tags</span>
+        <span class="tags-filter-clear" id="clearTagsFilter">Clear</span>
+      </div>
+      <div class="tags-filter-list" id="tagsFilterList"></div>
+    </div>
+
+    <div id="contextsList"></div>
+
+    <div id="emptyState" class="empty-state" style="display: none;">
+      <div class="empty-state-icon">🎯</div>
+      <div class="empty-state-text">No contexts yet</div>
+      <div class="empty-state-hint">
+        📸 Screenshot: <kbd>Cmd+Ctrl+Shift+4</kbd> then <kbd>Cmd+Shift+9</kbd><br>
+        📝 Text: <kbd>Cmd+Shift+V</kbd> · 🔗 Link: <kbd>Cmd+Shift+L</kbd>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for viewing screenshots -->
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal()">Close (ESC)</button>
+      <img id="modalImage" class="modal-image" src="" alt="Screenshot">
+    </div>
+  </div>
+
+  <!-- Modal for editing context -->
+  <div id="editModal" class="modal">
+    <div class="modal-content" style="max-width: 600px;">
+      <button class="modal-close" onclick="closeEditModal()">Close (ESC)</button>
+      <h2 style="margin-bottom: 20px;">✏️ Edit Context</h2>
+      <form id="editForm" style="display: flex; flex-direction: column; gap: 16px;">
+        <div>
+          <label for="editNote" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">Note:</label>
+          <textarea id="editNote" rows="6" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; font-size: 14px; resize: vertical;"></textarea>
+        </div>
+        <div>
+          <label for="editTags" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">Tags (comma-separated):</label>
+          <input type="text" id="editTags" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+          <div style="font-size: 12px; color: #666; margin-top: 4px;">Example: python, flask, api</div>
+        </div>
+        <div>
+          <label for="editProject" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">Project:</label>
+          <select id="editProject" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+          </select>
+        </div>
+        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
+          <button type="button" onclick="closeEditModal()" style="padding: 10px 20px; background: #f0f0f0; border: none; border-radius: 4px; cursor: pointer;">Cancel</button>
+          <button type="submit" style="padding: 10px 20px; background: #007AFF; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal for project management -->
+  <div id="projectModal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+      <button class="modal-close" onclick="closeProjectModal()">Close (ESC)</button>
+      <h2 id="projectModalTitle" style="margin-bottom: 20px;">➕ New Project</h2>
+      <form id="projectForm" style="display: flex; flex-direction: column; gap: 16px;">
+        <div>
+          <label for="projectNameInput" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">Project Name:</label>
+          <input type="text" id="projectNameInput" placeholder="Enter project name..." style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 16px;" required autofocus>
+          <div style="font-size: 12px; color: #666; margin-top: 4px;">Use clear, descriptive names like "MyApp", "Client Project", etc.</div>
+        </div>
+        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
+          <button type="button" onclick="closeProjectModal()" style="padding: 10px 20px; background: #f0f0f0; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">Cancel</button>
+          <button type="submit" style="padding: 10px 20px; background: #007AFF; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Manage Projects Modal -->
+  <div id="manageProjectsModal" class="modal">
+    <div class="modal-content" style="max-width: 700px;">
+      <button class="modal-close" onclick="closeManageProjectsModal()">Close (ESC)</button>
+      <h2 style="margin-bottom: 20px;">🔧 Manage Projects</h2>
+
+      <div style="margin-bottom: 20px;">
+        <button id="createNewProjectBtn" style="width: 100%; padding: 12px; background: #3b82f6; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+          ➕ Create New Project
+        </button>
+      </div>
+
+      <div id="projectsList" style="display: flex; flex-direction: column; gap: 12px; max-height: 500px; overflow-y: auto;">
+        <!-- Projects will be rendered here -->
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
