@@ -114,3 +114,49 @@ Once connected, you can ask Claude Code:
 - "What's in screenshot ID 1234567890?"
 
 For detailed setup and troubleshooting, see [`mcp-server/README.md`](mcp-server/README.md).
+
+## REST API for ChatGPT Integration
+
+Context Manager includes a **FastAPI REST API Server** that exposes your data to external clients like ChatGPT, enabling AI assistants to search and access your screenshots and notes!
+
+### Features
+
+- 🔍 **Search & Filter** - Query by keywords, tags, projects, dates
+- 📸 **Screenshot Access** - View screenshots as base64 images
+- 💾 **Create & Update** - Save and modify contexts via API
+- 📁 **File Upload** - Upload screenshots and documents
+- 🗑️ **Project Management** - List and delete projects
+- 🔌 **ChatGPT Custom GPT** - Integrate with ChatGPT Actions
+
+### Quick Start
+
+1. **Install Python dependencies:**
+   ```bash
+   cd rest-api
+   pip install -r requirements.txt
+   ```
+
+2. **Start the API server:**
+   ```bash
+   python server.py
+   ```
+
+3. **Access the API:**
+   - API: http://localhost:8000
+   - Interactive docs: http://localhost:8000/docs
+   - OpenAPI schema: http://localhost:8000/openapi.json
+
+### ChatGPT Integration
+
+Create a Custom GPT with Actions:
+1. Go to https://chat.openai.com/gpts/editor
+2. Configure Actions using the OpenAPI schema from http://localhost:8000/openapi.json
+3. Set server URL (use ngrok for testing: `ngrok http 8000`)
+4. Start asking ChatGPT to search your contexts!
+
+Example prompts:
+- "Find my recent screenshots about bugs"
+- "Search for notes tagged with 'meeting'"
+- "Show me contexts from MyProject"
+
+For detailed setup, security configuration, and production deployment, see [`rest-api/README.md`](rest-api/README.md).
