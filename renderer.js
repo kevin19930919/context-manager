@@ -1094,14 +1094,22 @@ editModal.addEventListener('click', (e) => {
 });
 
 // 監聽新增 context
-ipcRenderer.on('context-added', (event, newContext) => {
+ipcRenderer.on('context-added', async (event, newContext) => {
+  console.log('Context added:', newContext);
   contexts.push(newContext);
+  // 更新項目過濾器（以防是新項目）
+  await updateProjectFilter();
+  // 更新標籤過濾器（以防有新標籤）
+  updateTagsFilter();
   renderContexts();
 });
 
 // 監聽刪除 context
 ipcRenderer.on('context-deleted', (event, contextId) => {
+  console.log('Context deleted:', contextId);
   contexts = contexts.filter(c => c.id !== contextId);
+  // 更新標籤過濾器（可能有標籤不再使用）
+  updateTagsFilter();
   renderContexts();
 });
 
@@ -1113,6 +1121,37 @@ ipcRenderer.on('context-updated', (event, updatedContext) => {
     renderContexts();
     updateTagsFilter();
   }
+});
+
+// 監聽項目創建
+ipcRenderer.on('project-created', async (event, projectName) => {
+  console.log('Project created:', projectName);
+  await updateProjectFilter();
+  await loadContexts();
+});
+
+// 監聽項目刪除
+ipcRenderer.on('project-deleted', async (event, data) => {
+  console.log('Project deleted:', data.projectName);
+  // 從 contexts 中移除被刪除項目的所有 context
+  contexts = contexts.filter(c => c.project !== data.projectName);
+  await updateProjectFilter();
+  renderContexts();
+  updateTagsFilter();
+});
+
+// 監聽項目重命名
+ipcRenderer.on('project-renamed', async (event, data) => {
+  console.log('Project renamed:', data.oldName, '->', data.newName);
+  // 更新 contexts 中的項目名稱
+  contexts.forEach(c => {
+    if (c.project === data.oldName) {
+      c.project = data.newName;
+    }
+  });
+  await updateProjectFilter();
+  renderContexts();
+  updateTagsFilter();
 });
 
 // Update UI based on project selection

@@ -824,6 +824,11 @@ ipcMain.handle('save-link', async (event, { url, project, note, tags }) => {
     projectContexts.push(newContext);
     fs.writeFileSync(projectContextsFile, JSON.stringify(projectContexts, null, 2));
 
+    // 通知主視窗更新
+    if (mainWindow) {
+      mainWindow.webContents.send('context-added', newContext);
+    }
+
     console.log('Link saved successfully');
     return { success: true, context: newContext };
   } catch (error) {
@@ -857,6 +862,11 @@ ipcMain.handle('save-chat-as-context', async (event, { content, project, tags })
 
     // Write back to file
     writeProjectContexts(newContext.project, contexts);
+
+    // 通知主視窗更新
+    if (mainWindow) {
+      mainWindow.webContents.send('context-added', newContext);
+    }
 
     console.log(`Saved chat response as context in project: ${newContext.project}`);
     return { success: true, contextId: newContext.id };
@@ -1019,13 +1029,26 @@ ipcMain.handle('copy-file-to-folder', async (event, contextId) => {
     }
 
     let sourceFile;
+    let isTemporaryFile = false;
+
     if (context.type === 'screenshot' && context.screenshotPath) {
       sourceFile = context.screenshotPath;
-    } else if (context.type === 'text' && context.textContent) {
-      // For text, create a temporary file
+    } else if (context.filePath) {
+      // Handle uploaded files (text-file, file types)
+      sourceFile = context.filePath;
+    } else if (context.textContent) {
+      // For any context with text content (text, discussion, etc.), create a temporary file
       const tempFile = path.join(dataDir, `text-${contextId}.txt`);
       fs.writeFileSync(tempFile, context.textContent, 'utf8');
       sourceFile = tempFile;
+      isTemporaryFile = true;
+    } else if (context.type === 'link' && context.url) {
+      // For link contexts, create a text file with the URL and note
+      const linkContent = `${context.title || 'Link'}\n${context.url}\n\n${context.note || ''}`;
+      const tempFile = path.join(dataDir, `link-${contextId}.txt`);
+      fs.writeFileSync(tempFile, linkContent, 'utf8');
+      sourceFile = tempFile;
+      isTemporaryFile = true;
     } else {
       throw new Error('No file to copy');
     }
@@ -1042,7 +1065,7 @@ ipcMain.handle('copy-file-to-folder', async (event, contextId) => {
 
     if (result.canceled || result.filePaths.length === 0) {
       // Clean up temp file if created
-      if (context.type === 'text') {
+      if (isTemporaryFile) {
         fs.unlinkSync(sourceFile);
       }
       return { success: false, message: 'Cancelled' };
@@ -1056,7 +1079,7 @@ ipcMain.handle('copy-file-to-folder', async (event, contextId) => {
     fs.copyFileSync(sourceFile, destFile);
 
     // Clean up temp file if created
-    if (context.type === 'text') {
+    if (isTemporaryFile) {
       fs.unlinkSync(sourceFile);
     }
 
@@ -1095,8 +1118,11 @@ ipcMain.handle('move-file-to-folder', async (event, contextId) => {
     let sourceFile;
     if (context.type === 'screenshot' && context.screenshotPath) {
       sourceFile = context.screenshotPath;
-    } else if (context.type === 'text' && context.textContent) {
-      // For text, create a file
+    } else if (context.filePath) {
+      // Handle uploaded files (text-file, file types)
+      sourceFile = context.filePath;
+    } else if (context.textContent) {
+      // For any context with text content (text, discussion, etc.), create a file
       const project = context.project || 'Unassigned';
       const projectDir = path.join(screenshotsDir, project);
       if (!fs.existsSync(projectDir)) {
@@ -1104,6 +1130,19 @@ ipcMain.handle('move-file-to-folder', async (event, contextId) => {
       }
       const tempFile = path.join(projectDir, `text-${contextId}.txt`);
       fs.writeFileSync(tempFile, context.textContent, 'utf8');
+      sourceFile = tempFile;
+      context.screenshotPath = tempFile;
+      context.type = 'text-file'; // Mark as text file
+    } else if (context.type === 'link' && context.url) {
+      // For link contexts, create a text file with the URL and note
+      const project = context.project || 'Unassigned';
+      const projectDir = path.join(screenshotsDir, project);
+      if (!fs.existsSync(projectDir)) {
+        fs.mkdirSync(projectDir, { recursive: true });
+      }
+      const linkContent = `${context.title || 'Link'}\n${context.url}\n\n${context.note || ''}`;
+      const tempFile = path.join(projectDir, `link-${contextId}.txt`);
+      fs.writeFileSync(tempFile, linkContent, 'utf8');
       sourceFile = tempFile;
       context.screenshotPath = tempFile;
       context.type = 'text-file'; // Mark as text file
@@ -1200,6 +1239,11 @@ ipcMain.handle('rename-project', async (event, { oldName, newName }) => {
       writeProjectContexts(newName, contexts);
     }
 
+    // 通知主視窗更新
+    if (mainWindow) {
+      mainWindow.webContents.send('project-renamed', { oldName, newName, updatedCount });
+    }
+
     console.log(`Renamed project "${oldName}" to "${newName}" (${updatedCount} contexts updated)`);
 
     return { success: true, updatedCount };
@@ -1234,6 +1278,11 @@ ipcMain.handle('delete-project', async (event, { projectName }) => {
     // Delete files directory if it exists
     if (fs.existsSync(filesDir)) {
       fs.rmSync(filesDir, { recursive: true, force: true });
+    }
+
+    // 通知主視窗更新
+    if (mainWindow) {
+      mainWindow.webContents.send('project-deleted', { projectName, contextCount });
     }
 
     console.log(`Deleted project "${projectName}" (${contextCount} contexts removed)`);
@@ -1280,6 +1329,11 @@ ipcMain.handle('create-project', async (event, { projectName }) => {
     // Create empty contexts.json
     const contextsFile = path.join(projectDir, 'contexts.json');
     fs.writeFileSync(contextsFile, JSON.stringify([], null, 2));
+
+    // 通知主視窗更新項目列表
+    if (mainWindow) {
+      mainWindow.webContents.send('project-created', projectName);
+    }
 
     console.log(`Created project "${projectName}"`);
 
