@@ -1,0 +1,150 @@
+# Project: Context Manager
+
+## Session 开始时
+
+1. **读取上次 session 状态**
+   ```
+   调用 mcp__context-manager__get_latest_session(project="context-manager")
+   ```
+
+2. **如果找到上次的 session log**：
+   - 告诉用户：
+     - 上次的任务是什么
+     - 已完成的事项
+     - 未完成的事项
+     - 上次学到了什么
+     - 建议从哪里开始
+   - 询问：「要继续上次的工作，还是开始新任务?」
+
+3. **如果没有找到 session log**：
+   - 这是第一次做这个项目的 session
+   - 直接开始工作
+
+## Session 进行中
+
+1. **做架构决定时**：
+   - 立刻使用 `mcp__context-manager__save_decision` 记录
+   - 记下返回的 decision context ID，稍后要关联到 session log
+
+2. **解决问题时**：
+   - 使用 `mcp__context-manager__save_problem_solution` 记录问题和解决方案
+   - 同样记下 context ID
+
+## Session 结束时（用户说 "wrap up" 或 "结束"）
+
+1. **整理这个 session 做了什么**：
+   - 列出 3-5 个主要完成的事项
+   - 列出未完成的事项
+   - 确定下次从哪里开始
+
+2. **问用户：「今天你学到了什么？」**
+   - 这个问题不能跳过
+   - 用户必须思考并回答
+   - 这是成长的关键
+
+3. **保存 session log**：
+   ```
+   调用 mcp__context-manager__save_session_log({
+     project: "context-manager",
+     task: "这个 session 的主要任务",
+     what_done: [
+       "完成的事项1",
+       "完成的事项2",
+       "完成的事项3"
+     ],
+     decisions: [decision_id1, decision_id2],  // 之前记录的 decision IDs
+     incomplete: [
+       "未完成的事项1",
+       "未完成的事项2"
+     ],
+     next_step: "下次从这里开始",
+     learning: "用户说的学到了什么",
+     related_files: [
+       "src/main.py",
+       "src/utils.py"
+     ]
+   })
+   ```
+
+4. **确认保存成功**：
+   - 告诉用户 session log 已保存
+   - 显示 context ID
+
+## 核心原则
+
+1. **Session log 不是记录所有对话**
+   - 只记录：做了什么、决定了什么、未完成的、下次起点、学到了什么
+
+2. **「学到了什么」不能省略**
+   - 这是人必须做的反思
+   - Agent 不能代替用户填写
+   - 如果用户不回答，要继续询问
+
+3. **决策要有脉络**
+   - 每个 decision 都应该关联到 session log
+   - 这样可以追溯「为什么当初这样做」
+
+4. **下次起点要明确**
+   - 一句话说清楚下次从哪里开始
+   - 让下次 session 5 秒内恢复状态
+
+## 示例对话
+
+### Session 开始
+```
+User: "继续昨天的工作"
+
+Agent: [调用 get_latest_session]
+"昨天的 session：
+
+Task: 实现 session log 功能
+状态: 进行中
+
+已完成：
+✓ 新增了 save_session_log 方法
+✓ 新增了 get_latest_session 方法
+✓ 做了架构决定：用 type='session-log'（decision#1774550001）
+
+未完成：
+☐ 添加 MCP tools
+☐ 创建 CLAUDE.md 模板
+☐ 测试功能
+
+昨天学到的：
+理解了 session log 跟 context 的差异，session log 是为了恢复状态，不是记录所有细节
+
+下次起点：添加 MCP tools 到 server.py
+
+要继续吗？"
+```
+
+### Session 结束
+```
+User: "wrap up"
+
+Agent: "好的，让我整理一下这个 session：
+
+做了什么：
+- 在 server.py 添加了两个 MCP tools
+- 创建了 CLAUDE.md 模板
+- 测试了 session log 功能
+
+还没做完：
+- 更新 README 文档
+- 写使用示例
+
+下次建议从：更新 README 开始
+
+**今天你学到了什么？**"
+
+User: "学会了如何设计 MCP tools 的 schema，特别是如何处理可选参数"
+
+Agent: [调用 save_session_log]
+"✓ Session log 已保存！ID: 1774550123456"
+```
+
+## 相关文件
+
+- `mcp-server/context_manager.py` - 核心逻辑
+- `mcp-server/server.py` - MCP server 实现
+- `README.md` - 项目文档
