@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Resource, Tool, TextContent
-from context_manager import ContextManager
+from context_manager import ContextManager, ProjectNotFoundError, ProjectAlreadyExistsError
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -92,7 +92,7 @@ async def list_tools() -> list[Tool]:
                     },
                     "type": {
                         "type": "string",
-                        "enum": ["screenshot", "text", "text-file"],
+                        "enum": ["screenshot", "text", "text-file", "discussion", "decision", "problem-solution", "api-design", "session-log"],
                         "description": "Filter by context type"
                     },
                     "project": {
@@ -216,6 +216,38 @@ async def list_tools() -> list[Tool]:
                     "project": {
                         "type": "string",
                         "description": "Name of the project to delete"
+                    }
+                },
+                "required": ["project"]
+            }
+        ),
+        Tool(
+            name="create_project",
+            description="Create a new project in Context Manager. Must be called before saving any contexts to a new project.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project": {
+                        "type": "string",
+                        "description": "Project name (must be unique, no special characters or path separators)"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Optional project description"
+                    }
+                },
+                "required": ["project"]
+            }
+        ),
+        Tool(
+            name="project_exists",
+            description="Check if a project exists in Context Manager.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project": {
+                        "type": "string",
+                        "description": "Project name to check"
                     }
                 },
                 "required": ["project"]
@@ -496,6 +528,95 @@ async def list_tools() -> list[Tool]:
                 },
                 "required": ["context_id"]
             }
+        ),
+        Tool(
+            name="save_session_log",
+            description="Save a session log entry to help quickly restore state in the next session. Records what was done, decisions made, incomplete items, and learnings.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project": {
+                        "type": "string",
+                        "description": "Project name"
+                    },
+                    "task": {
+                        "type": "string",
+                        "description": "Task description"
+                    },
+                    "what_done": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of completed items"
+                    },
+                    "challenges": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Challenges or blockers encountered during the session"
+                    },
+                    "decisions": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "description": "Related decision context IDs"
+                    },
+                    "incomplete": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of incomplete items"
+                    },
+                    "next_step": {
+                        "type": "string",
+                        "description": "Where to start next time"
+                    },
+                    "learning": {
+                        "type": "string",
+                        "description": "What did you learn today? (user must fill this)"
+                    },
+                    "ai_suggestions": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "AI suggestions for software engineer growth based on this session"
+                    },
+                    "start_time": {
+                        "type": "string",
+                        "description": "Start time (HH:MM)"
+                    },
+                    "end_time": {
+                        "type": "string",
+                        "description": "End time (HH:MM)"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": ["completed", "in_progress"],
+                        "default": "completed",
+                        "description": "Session status"
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Tags for categorization"
+                    },
+                    "related_files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Related code file paths"
+                    }
+                },
+                "required": ["project", "task", "what_done"]
+            }
+        ),
+        Tool(
+            name="get_latest_session",
+            description="Get the most recent session log for a project to quickly restore state from the last session.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project": {
+                        "type": "string",
+                        "description": "Project name"
+                    }
+                },
+                "required": ["project"]
+            }
         )
     ]
 
@@ -530,6 +651,21 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = manager.delete_project(arguments["project"])
             logger.info(f"delete_project deleted project {arguments.get('project')}")
 
+        elif name == "create_project":
+            result = manager.create_project(
+                arguments["project"],
+                arguments.get("description", "")
+            )
+            logger.info(f"create_project created project {arguments['project']}")
+
+        elif name == "project_exists":
+            exists = manager.project_exists(arguments["project"])
+            result = {
+                "project": arguments["project"],
+                "exists": exists
+            }
+            logger.info(f"project_exists checked {arguments['project']}: {exists}")
+
         elif name == "get_recent_contexts":
             result = manager.get_recent_contexts(
                 arguments.get("limit", 20),
@@ -561,6 +697,16 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = manager.update_context(**arguments)
             logger.info(f"update_context updated context {arguments.get('context_id')}")
 
+        elif name == "save_session_log":
+            result = manager.save_session_log(**arguments)
+            logger.info(f"save_session_log created session log in project {arguments.get('project')}")
+
+        elif name == "get_latest_session":
+            result = manager.get_latest_session(arguments["project"])
+            if result is None:
+                result = {"message": f"No session logs found for project {arguments['project']}"}
+            logger.info(f"get_latest_session returned session for project {arguments.get('project')}")
+
         else:
             raise ValueError(f"Unknown tool: {name}")
 
@@ -569,11 +715,46 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             text=json.dumps(result, indent=2, ensure_ascii=False)
         )]
 
+    except ProjectNotFoundError as e:
+        logger.warning(f"Project not found in tool {name}: {e}")
+        return [TextContent(
+            type="text",
+            text=json.dumps({
+                "error": str(e),
+                "error_type": "ProjectNotFound",
+                "hint": "Use create_project tool to create the project first"
+            }, indent=2)
+        )]
+
+    except ProjectAlreadyExistsError as e:
+        logger.warning(f"Project already exists in tool {name}: {e}")
+        return [TextContent(
+            type="text",
+            text=json.dumps({
+                "error": str(e),
+                "error_type": "ProjectAlreadyExists",
+                "hint": "Choose a different project name or delete the existing project"
+            }, indent=2)
+        )]
+
+    except ValueError as e:
+        logger.warning(f"Validation error in tool {name}: {e}")
+        return [TextContent(
+            type="text",
+            text=json.dumps({
+                "error": str(e),
+                "error_type": "ValidationError"
+            }, indent=2)
+        )]
+
     except Exception as e:
         logger.error(f"Error in tool {name}: {e}", exc_info=True)
         return [TextContent(
             type="text",
-            text=json.dumps({"error": str(e)}, indent=2)
+            text=json.dumps({
+                "error": str(e),
+                "error_type": "InternalError"
+            }, indent=2)
         )]
 
 

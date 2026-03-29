@@ -81,6 +81,18 @@ Context Manager includes an **MCP (Model Context Protocol) Server** that exposes
 - 💾 **Create Contexts** - Save notes from Claude Code to Context Manager
 - 📋 **List Projects** - View all project names
 - ⏰ **Recent Contexts** - Quickly access latest contexts
+- 🎯 **Project Management** - Create and validate projects with metadata
+- 🛡️ **Project Validation** - Ensures projects exist before operations
+
+### ⚠️ Breaking Changes (v0.2.0+)
+
+**Projects must be created before use:**
+- Use `create_project` tool to create new projects
+- All context operations now require existing projects
+- Auto-migration: Incomplete projects are automatically repaired
+- Session logs: Claude Code will prompt to create missing projects
+
+**Migration:** Existing projects continue to work automatically.
 
 ### Quick Setup
 
@@ -108,10 +120,12 @@ Context Manager includes an **MCP (Model Context Protocol) Server** that exposes
 ### Usage Examples
 
 Once connected, you can ask Claude Code:
-- "Find my recent bug screenshots"
-- "Search for 'API' related notes"
-- "Show contexts from project 'MyProject'"
-- "What's in screenshot ID 1234567890?"
+- **Create a project:** "Create a new project called 'my-app'"
+- **Find contexts:** "Find my recent bug screenshots"
+- **Search:** "Search for 'API' related notes"
+- **Project contexts:** "Show contexts from project 'MyProject'"
+- **View details:** "What's in screenshot ID 1234567890?"
+- **Session logs:** "Wrap up" (saves session log, auto-prompts if project doesn't exist)
 
 For detailed setup and troubleshooting, see [`mcp-server/README.md`](mcp-server/README.md).
 

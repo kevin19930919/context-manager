@@ -53,39 +53,83 @@ function cleanupTempFolder() {
 }
 
 // Helper functions for per-project contexts
-function getProjectContextsFile(project) {
-  const projectDir = path.join(screenshotsDir, project);
-  return path.join(projectDir, 'contexts.json');
-}
-
 function readProjectContexts(project) {
-  const contextFile = getProjectContextsFile(project);
-  if (!fs.existsSync(contextFile)) {
-    return [];
+  // Read from screenshots folder
+  const screenshotsContextFile = path.join(screenshotsDir, project, 'contexts.json');
+  let screenshotsContexts = [];
+  if (fs.existsSync(screenshotsContextFile)) {
+    try {
+      screenshotsContexts = JSON.parse(fs.readFileSync(screenshotsContextFile, 'utf8'));
+    } catch (error) {
+      console.error(`Error reading screenshots contexts for project ${project}:`, error);
+    }
   }
-  try {
-    return JSON.parse(fs.readFileSync(contextFile, 'utf8'));
-  } catch (error) {
-    console.error(`Error reading contexts for project ${project}:`, error);
-    return [];
+
+  // Read from files folder
+  const filesDir = path.join(__dirname, 'data', 'files', project);
+  const filesContextFile = path.join(filesDir, 'contexts.json');
+  let filesContexts = [];
+  if (fs.existsSync(filesContextFile)) {
+    try {
+      filesContexts = JSON.parse(fs.readFileSync(filesContextFile, 'utf8'));
+    } catch (error) {
+      console.error(`Error reading files contexts for project ${project}:`, error);
+    }
   }
+
+  // Merge and return all contexts
+  return [...screenshotsContexts, ...filesContexts];
 }
 
 function writeProjectContexts(project, contexts) {
-  const projectDir = path.join(screenshotsDir, project);
-  if (!fs.existsSync(projectDir)) {
-    fs.mkdirSync(projectDir, { recursive: true });
+  // Split contexts by type
+  const screenshotContexts = contexts.filter(c => c.type === 'screenshot' || c.screenshotPath);
+  const fileContexts = contexts.filter(c => c.type !== 'screenshot' && !c.screenshotPath);
+
+  // Write screenshots contexts
+  const screenshotsDir = path.join(__dirname, 'data', 'screenshots', project);
+  if (!fs.existsSync(screenshotsDir)) {
+    fs.mkdirSync(screenshotsDir, { recursive: true });
   }
-  const contextFile = getProjectContextsFile(project);
-  fs.writeFileSync(contextFile, JSON.stringify(contexts, null, 2));
+  const screenshotsContextFile = path.join(screenshotsDir, 'contexts.json');
+  fs.writeFileSync(screenshotsContextFile, JSON.stringify(screenshotContexts, null, 2));
+
+  // Write files contexts
+  const filesDir = path.join(__dirname, 'data', 'files', project);
+  if (!fs.existsSync(filesDir)) {
+    fs.mkdirSync(filesDir, { recursive: true });
+  }
+  const filesContextFile = path.join(filesDir, 'contexts.json');
+  fs.writeFileSync(filesContextFile, JSON.stringify(fileContexts, null, 2));
 }
 
 function getAllProjects() {
-  const items = fs.readdirSync(screenshotsDir);
-  return items.filter(item => {
-    const itemPath = path.join(screenshotsDir, item);
-    return fs.statSync(itemPath).isDirectory() && item !== '_temp';
-  });
+  const projects = new Set();
+
+  // Scan screenshots directory
+  if (fs.existsSync(screenshotsDir)) {
+    const screenshotItems = fs.readdirSync(screenshotsDir);
+    screenshotItems.forEach(item => {
+      const itemPath = path.join(screenshotsDir, item);
+      if (fs.statSync(itemPath).isDirectory() && item !== '_temp') {
+        projects.add(item);
+      }
+    });
+  }
+
+  // Scan files directory
+  const filesBaseDir = path.join(__dirname, 'data', 'files');
+  if (fs.existsSync(filesBaseDir)) {
+    const fileItems = fs.readdirSync(filesBaseDir);
+    fileItems.forEach(item => {
+      const itemPath = path.join(filesBaseDir, item);
+      if (fs.statSync(itemPath).isDirectory()) {
+        projects.add(item);
+      }
+    });
+  }
+
+  return Array.from(projects).sort();
 }
 
 function createMainWindow() {
@@ -1263,8 +1307,8 @@ ipcMain.handle('delete-project', async (event, { projectName }) => {
     const projectDir = path.join(screenshotsDir, projectName);
     const filesDir = path.join(__dirname, 'data', 'files', projectName);
 
-    // Check if project exists
-    if (!fs.existsSync(projectDir)) {
+    // Check if project exists in either location
+    if (!fs.existsSync(projectDir) && !fs.existsSync(filesDir)) {
       throw new Error('Project not found');
     }
 

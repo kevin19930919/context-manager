@@ -9,3 +9,8 @@ __pycache__/
 *$py.class
 *.so
 .Python
+mcp-server/uv.lock
+
+# Local setup / personal notes
+SESSION_LOG_SETUP.md
+test_session_log.py
